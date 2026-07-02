@@ -16,6 +16,8 @@ let gameOver = false;
 const log = [];
 
 
+
+
 const winnerPopup = document.getElementById('win-lose-popup');
 const winnerText = winnerPopup.children[0]
 
@@ -27,43 +29,104 @@ const SHIP_LENGTHS = [5, 4, 3, 3, 2];
 const SHIP_SKINS = ['ship-5', 'ship-4', 'submarine', 'cruiser', 'ship-2'];
 
 
+let mode = "hunt";
+let firstHit = null;
+let direction = null;       // {dx, dy} once locked
+let triedDirection = null;  // the direction we're currently probing (before it's confirmed)
+let triedNeighbors = [];
+let lastShot = null;
 
+const DIRECTIONS = [
+    { dx: 1, dy: 0 },
+    { dx: -1, dy: 0 },
+    { dx: 0, dy: 1 },
+    { dx: 0, dy: -1 }
+];
 
+function isLegalTarget(x, y, gameboard) {
+    if (x < 0 || x > 9 || y < 0 || y > 9) return false;
+    const value = gameboard.board[x][y];
+    const missed = gameboard.getMissedAttacks().some(a => a.x === x && a.y === y);
+    return !missed && !(value !== null && value.hit);
+}
 
-
-
-
-
+function resetTargeting() {
+    mode = "hunt";
+    firstHit = null;
+    direction = null;
+    triedDirection = null;
+    triedNeighbors = [];
+    lastShot = null;
+}
 
 function computerMove(gameboard, container){
+    let x, y;
 
-    const board = gameboard.board;
-    
-    const missedAttacks = gameboard.getMissedAttacks();
-    
+    if (mode === "hunt") {
+        do {
+            x = Math.floor(Math.random() * 10);
+            y = Math.floor(Math.random() * 10);
+        } while (!isLegalTarget(x, y, gameboard));
+    }
+    else { // mode === "target"
+        if (!direction) {
+            // still probing the 4 neighbors of firstHit
+            const candidates = DIRECTIONS
+                .map(d => ({ x: firstHit.x + d.dx, y: firstHit.y + d.dy, dir: d }))
+                .filter(c => !triedNeighbors.some(t => t.x === c.x && t.y === c.y));
 
+            const pick = candidates.find(c => isLegalTarget(c.x, c.y, gameboard));
 
-    let x = Math.floor(Math.random() * 10);
-    let y = Math.floor(Math.random() * 10);
-    let value = board[x][y];
+            x = pick.x;
+            y = pick.y;
+            triedDirection = pick.dir;
+        }
+        else {
+            // direction locked, walk the line
+            let next = { x: lastShot.x + direction.dx, y: lastShot.y + direction.dy };
 
-    
+            if (!isLegalTarget(next.x, next.y, gameboard)) {
+                // dead end - reverse and walk from firstHit the other way
+                direction = { dx: -direction.dx, dy: -direction.dy };
+                next = { x: firstHit.x + direction.dx, y: firstHit.y + direction.dy };
+            }
 
-    while( (missedAttacks.some(attack => attack.x === x && attack.y === y)) ||
-    (value !== null && value.hit)){
-        
-        x = Math.floor(Math.random() * 10);
-        y = Math.floor(Math.random() * 10);
-        value = board[x][y];
+            x = next.x;
+            y = next.y;
+        }
     }
 
     const cell = getCellElement(container, x, y);
     updateCell(x, y, gameboard, cell, false);
 
-
     const result = (gameboard.board[x][y] !== null) ? "HIT" : "MISS";
     const sunk = (result === "HIT") && gameboard.board[x][y].ship.isSunk();
-    return {x , y, result, sunk}
+
+    if (sunk) {
+        resetTargeting();
+    }
+    else if (result === "HIT") {
+        if (mode === "hunt") {
+            mode = "target";
+            firstHit = { x, y };
+        }
+        else if (!direction) {
+            // this probe connected - lock it in as the direction
+            direction = triedDirection;
+        }
+        lastShot = { x, y };
+    }
+    else { // MISS
+        if (mode === "target" && !direction) {
+            triedNeighbors.push({ x, y });
+        }
+        else if (mode === "target" && direction) {
+            direction = { dx: -direction.dx, dy: -direction.dy };
+            lastShot = firstHit;
+        }
+    }
+
+    return { x, y, result, sunk };
 }
 
 function checkAllShipsPlaced(shipContainer){
@@ -128,7 +191,7 @@ function handleTurn(x, y, gameboard, cell, isEnemyBoard){
             renderExplosion(document.getElementById('player-board')); 
         }
         inputLocked = false;
-      }, 1);
+      }, 1000);
 
 }
 
