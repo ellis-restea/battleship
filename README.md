@@ -1,6 +1,6 @@
 Battleship
 
-A browser-based Battleship game built with vanilla JavaScript, HTML5 Drag & Drop, and Webpack. Play against a computer opponent with full ship placement, turn-based combat, and a live move log. Built according to the steps outline in the Odin Project.
+A browser-based Battleship game built with vanilla JavaScript, HTML5 Drag & Drop, and Webpack. Play against a computer opponent with full ship placement, turn-based combat, and a live move log. Built according to the steps outlined in the Odin Project.
 
 Features
 Drag-and-drop ship placement — drag ships from the staging area onto your board, hold Shift to rotate horizontal/vertical, with a live ghost-outline preview
